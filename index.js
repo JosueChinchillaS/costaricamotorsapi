@@ -117,17 +117,18 @@ const startServer = async () => {
           // Determine the type of event
           switch (evt.type) {
             case "user.created":
+              const { id, email_addresses, first_name, last_name, username } =
+                evt.data;
               // Extract user data from the event
-              const newUser = {
-                clerkId: evt.data.id,
-                email: evt.data?.emailAddresses[0]?.emailAddress, // Assuming the first email is the primary one
-                username: evt.data.username,
-                firstName: evt.data.firstName,
-                lastName: evt.data.lastName,
-                // Add other fields as necessary
+              const user = {
+                clerkId: id,
+                email: email_addresses[0].email_address,
+                username: username,
+                firstName: first_name,
+                lastName: last_name,
               };
               // Create a new user in MongoDB
-              await User.create(newUser);
+              await User.create(user);
               break;
             case "user.updated":
               // Update the user in MongoDB
