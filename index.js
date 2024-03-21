@@ -4,6 +4,10 @@ require("dotenv").config();
 const { ApolloServer } = require("apollo-server-express");
 const express = require("express");
 const { Clerk } = require("@clerk/clerk-sdk-node");
+const cors = require("cors");
+const { Webhook } = require("svix");
+const bodyParser = require("body-parser");
+
 const User = require("./models/User");
 // Initialize Clerk
 const clerk = new Clerk(process.env.CLERK_API_KEY);
@@ -69,42 +73,65 @@ const startServer = async () => {
     // },
   });
 
+  app.use(cors());
+
   try {
     await server.start();
     server.applyMiddleware({ app, path: "/api/graphql" });
 
-    app.post("/webhooks/clerk", async (req, res) => {
-      const { type, data } = req.body;
+    app.post(
+      "/api/webhooks",
+      bodyParser.raw({ type: "application/json" }),
+      async (req, res) => {
+        const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
+        if (!WEBHOOK_SECRET) {
+          return res
+            .status(500)
+            .json({ error: "WEBHOOK_SECRET is not configured." });
+        }
 
-      if (type === "user.created" || type === "user.updated") {
+        const headers = req.headers;
+        const payload = req.body;
+
+        const svix_id = headers["svix-id"];
+        const svix_timestamp = headers["svix-timestamp"];
+        const svix_signature = headers["svix-signature"];
+
+        if (!svix_id || !svix_timestamp || !svix_signature) {
+          return res
+            .status(400)
+            .json({ error: "Error occurred -- no svix headers" });
+        }
+
+        const wh = new Webhook(WEBHOOK_SECRET);
+
         try {
-          const userPayload = {
-            clerkId: data.id,
-            email:
-              data.emailAddresses.length > 0
-                ? data.emailAddresses[0].emailAddress
-                : "",
-            username: data.username,
-            firstName: data.firstName,
-            lastName: data.lastName,
-          };
+          const evt = wh.verify(payload.toString(), {
+            "svix-id": svix_id,
+            "svix-timestamp": svix_timestamp,
+            "svix-signature": svix_signature,
+          });
 
-          // Upsert user in MongoDB
-          const user = await User.findOneAndUpdate(
-            { clerkId: data.id },
-            userPayload,
-            { new: true, upsert: true }
+          // Handle the webhook event here
+          // For example, logging the event:
+          console.log(
+            `Webhook with ID: ${evt.id}, Type: ${evt.type}`,
+            evt.data
           );
-          console.log("User created or updated in MongoDB:", user);
+
+          // You may want to call a function here that handles the event
+
+          return res
+            .status(200)
+            .json({ success: true, message: "Webhook received" });
         } catch (error) {
-          console.error("Error processing Clerk webhook:", error);
-          return res.status(500).json({ error: "Internal server error" });
+          console.error("Webhook verification failed:", error.message);
+          return res
+            .status(400)
+            .json({ success: false, message: "Webhook failed to verify" });
         }
       }
-
-      // Respond to Clerk to acknowledge receipt of the webhook
-      res.status(200).json({ message: "Webhook processed" });
-    });
+    );
 
     const port = process.env.PORT || 4000;
     app.listen(port, () => {
