@@ -112,13 +112,15 @@ const startServer = async () => {
             "svix-signature": svix_signature,
           });
 
+          console.log(evt);
+
           // Determine the type of event
           switch (evt.type) {
             case "user.created":
               // Extract user data from the event
               const newUser = {
                 clerkId: evt.data.id,
-                email: evt.data.emailAddresses[0].emailAddress, // Assuming the first email is the primary one
+                email: evt.data?.emailAddresses[0]?.emailAddress, // Assuming the first email is the primary one
                 username: evt.data.username,
                 firstName: evt.data.firstName,
                 lastName: evt.data.lastName,
