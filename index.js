@@ -112,18 +112,46 @@ const startServer = async () => {
             "svix-signature": svix_signature,
           });
 
-          // Handle the webhook event here
-          // For example, logging the event:
-          console.log(
-            `Webhook with ID: ${evt.id}, Type: ${evt.type}`,
-            evt.data
-          );
+          // Determine the type of event
+          switch (evt.type) {
+            case "user.created":
+              // Extract user data from the event
+              const newUser = {
+                clerkId: evt.data.id,
+                email: evt.data.emailAddresses[0].emailAddress, // Assuming the first email is the primary one
+                username: evt.data.username,
+                firstName: evt.data.firstName,
+                lastName: evt.data.lastName,
+                // Add other fields as necessary
+              };
+              // Create a new user in MongoDB
+              await User.create(newUser);
+              break;
+            case "user.updated":
+              // Update the user in MongoDB
+              await User.findOneAndUpdate(
+                { clerkId: evt.data.id },
+                {
+                  email: evt.data.emailAddresses[0].emailAddress,
+                  username: evt.data.username,
+                  firstName: evt.data.firstName,
+                  lastName: evt.data.lastName,
+                  // Update other fields as necessary
+                },
+                { new: true }
+              );
+              break;
+            case "user.deleted":
+              // Delete the user from MongoDB
+              await User.findOneAndDelete({ clerkId: evt.data.id });
+              break;
+            // Handle other event types as necessary
+          }
 
-          // You may want to call a function here that handles the event
-
+          console.log(`Handled webhook event: ${evt.type}`);
           return res
             .status(200)
-            .json({ success: true, message: "Webhook received" });
+            .json({ success: true, message: "Webhook handled successfully" });
         } catch (error) {
           console.error("Webhook verification failed:", error.message);
           return res
