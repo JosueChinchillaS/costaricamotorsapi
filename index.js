@@ -114,11 +114,11 @@ const startServer = async () => {
 
           console.log(evt);
 
+          const { id, email_addresses, first_name, last_name, username } =
+            evt.data;
           // Determine the type of event
           switch (evt.type) {
             case "user.created":
-              const { id, email_addresses, first_name, last_name, username } =
-                evt.data;
               // Extract user data from the event
               const user = {
                 clerkId: id,
@@ -133,12 +133,12 @@ const startServer = async () => {
             case "user.updated":
               // Update the user in MongoDB
               await User.findOneAndUpdate(
-                { clerkId: evt.data.id },
+                { clerkId: id },
                 {
-                  email: evt.data.emailAddresses[0].emailAddress,
-                  username: evt.data.username,
-                  firstName: evt.data.firstName,
-                  lastName: evt.data.lastName,
+                  email: email_addresses[0].email_address,
+                  username: username,
+                  firstName: first_name,
+                  lastName: last_name,
                   // Update other fields as necessary
                 },
                 { new: true }
@@ -146,7 +146,7 @@ const startServer = async () => {
               break;
             case "user.deleted":
               // Delete the user from MongoDB
-              await User.findOneAndDelete({ clerkId: evt.data.id });
+              await User.findOneAndDelete({ clerkId: id });
               break;
             // Handle other event types as necessary
           }
